@@ -8,6 +8,9 @@
     "numReplicas": 1,
     "sleepApplication": false,
     "startCommand": "python main.py",
+    "port": 8000,
+    "healthcheckPath": "/health",
+    "healthcheckTimeout": 300,
     "multiRegionConfig": {
       "europe-west4-drams3a": {
         "numReplicas": 1
