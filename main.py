@@ -7,25 +7,25 @@ import datetime
 import logging
 from logging.handlers import RotatingFileHandler
 
-# تنظیمات لاگ
+# Log settings
 LOG_FILE = "bot_log.json"
-LOG_MAX_BYTES = 5 * 1024 * 1024  # 5 مگابایت
-LOG_BACKUP_COUNT = 3  # حداکثر 3 فایل آرشیو
+LOG_MAX_BYTES = 5 * 1024 * 1024  # 5 MB
+LOG_BACKUP_COUNT = 3  # Max 3 backup files
 
-# تنظیم لاگ کنسول
+# Configure console logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
-# تنظیم لاگ فایل چرخشی
+# Configure rotating file logging
 file_handler = RotatingFileHandler("bot.log", maxBytes=LOG_MAX_BYTES, backupCount=LOG_BACKUP_COUNT)
 file_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
 logger.addHandler(file_handler)
 
 def log_event(event_type, details):
-    """ثبت رویداد در فایل JSON و کنسول"""
+    """Log an event to JSON file and console"""
     log_entry = {
         "timestamp": datetime.datetime.now().isoformat(),
         "event_type": event_type,
@@ -33,7 +33,7 @@ def log_event(event_type, details):
     }
     logger.info(f"{event_type}: {details}")
     
-    # ذخیره در فایل JSON
+    # Save to JSON file
     try:
         logs = []
         if os.path.exists(LOG_FILE):
@@ -43,7 +43,7 @@ def log_event(event_type, details):
         with open(LOG_FILE, "w", encoding="utf-8") as f:
             json.dump(logs, f, ensure_ascii=False, indent=2)
     except Exception as e:
-        logger.error(f"خطا در ذخیره لاگ: {e}")
+        logger.error(f"Error saving log: {e}")
 
 # Create session.json from ENV if present
 if os.environ.get("SESSION_JSON"):
@@ -66,14 +66,14 @@ from order_handler import OrderHandler
 from reply_generator import ReplyGenerator
 from settings import SETTINGS
 
-# تنظیمات محدودیت اینستاگرام
+# Instagram limits
 MAX_MESSAGES_PER_HOUR = 10
 MAX_MESSAGES_PER_DAY = 30
-ACTIVE_HOURS = range(8, 22)  # 8 صبح تا 10 شب
-MESSAGE_LOG = []  # لاگ پیام‌های ارسالی
+ACTIVE_HOURS = range(8, 22)  # 8 AM to 10 PM
+MESSAGE_LOG = []  # Store sent messages
 
 def is_active_time():
-    """چک کردن ساعات فعال"""
+    """Check if current time is within active hours"""
     return datetime.datetime.now().hour in ACTIVE_HOURS
 
 async def main():
@@ -82,11 +82,11 @@ async def main():
     log_event("info", "Connected to Instagram")
 
     generator = ReplyGenerator()
-    await asyncio.sleep(generator.get_human_delay())  # تأخیر اولیه
+    await asyncio.sleep(generator.get_human_delay())  # Initial delay
     log_event("info", "Language model loaded")
 
     responder = Responder(insta, generator)
-    log_event("info", "Responder module is ready")
+    log_event("info", "Responder module ready")
 
     order_handler = OrderHandler()
     log_event("info", "Order handler initialized")
@@ -97,30 +97,30 @@ async def main():
 
     while True:
         if not is_active_time():
-            log_event("info", "خارج از ساعات فعال، خواب برای 1 ساعت")
+            log_event("info", "Outside active hours, sleeping for 1 hour")
             await asyncio.sleep(3600)
             continue
 
-        # ریست شمارشگر ساعتی
+        # Reset hourly counter
         current_hour = datetime.datetime.now().hour
         if current_hour != last_hour:
             hourly_count = 0
             last_hour = current_hour
 
-        # ریست شمارشگر روزانه
+        # Reset daily counter
         if MESSAGE_LOG and datetime.datetime.now().day != MESSAGE_LOG[-1]["timestamp"].day:
             daily_count = 0
 
-        # چک کردن محدودیت‌ها
+        # Check message limits
         if hourly_count >= MAX_MESSAGES_PER_HOUR or daily_count >= MAX_MESSAGES_PER_DAY:
-            log_event("warning", f"به محدودیت پیام رسیدیم (ساعتی: {hourly_count}, روزانه: {daily_count})، خواب برای 1 ساعت")
+            log_event("warning", f"Message limit reached (hourly: {hourly_count}, daily: {daily_count}), sleeping for 1 hour")
             await asyncio.sleep(3600)
             continue
 
         log_event("info", "Checking for new messages")
         try:
             messages = insta.get_unread_messages()
-            log_event("info", f"Messages received: {len(messages)}")
+            log_event("info", f"Received {len(messages)} messages")
 
             for msg in messages:
                 log_event("info", f"Message from user {msg.user_id}: {msg.text}")
@@ -129,9 +129,9 @@ async def main():
                     log_event("info", "Skipping message from self")
                     continue
 
-                # جلوگیری از پاسخ تکراری
+                # Prevent duplicate replies
                 if any(log["recipient"] == msg.user_id for log in MESSAGE_LOG[-10:]):
-                    log_event("info", f"پیام تکراری از {msg.user_id}، رد می‌شود")
+                    log_event("info", f"Duplicate message from {msg.user_id}, skipping")
                     continue
 
                 if order_handler.is_order_request(msg.text):
@@ -151,16 +151,16 @@ async def main():
                     })
                     hourly_count += 1
                     daily_count += 1
-                    # تأخیر تصادفی بین پیام‌ها
+                    # Random delay between messages
                     await asyncio.sleep(random.uniform(5, 30))
                 except Exception as e:
-                    log_event("error", f"خطا در ارسال پیام به {msg.user_id}: {e}")
+                    log_event("error", f"Error sending message to {msg.user_id}: {e}")
                     if "rate limit" in str(e).lower() or "challenge_required" in str(e).lower():
-                        log_event("warning", "محدودیت API، خواب برای 4 ساعت")
+                        log_event("warning", "API rate limit hit, sleeping for 4 hours")
                         await asyncio.sleep(4 * 3600)
 
         except Exception as e:
-            log_event("error", f"خطا در گرفتن پیام‌ها: {e}")
+            log_event("error", f"Error fetching messages: {e}")
             await asyncio.sleep(60)
 
         log_event("info", "Sleeping for 30-120 seconds")
