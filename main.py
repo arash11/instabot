@@ -33,6 +33,8 @@ def main():
     print("✅ Connected to Instagram.")
 
     generator = ReplyGenerator()
+    delay = generator.get_human_delay()
+    time.sleep(delay)
     print("🧠 Language model loaded.")
 
     responder = Responder(insta, generator)
