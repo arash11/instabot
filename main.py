@@ -76,6 +76,10 @@ def is_active_time():
     """Check if current time is within active hours"""
     return datetime.datetime.now().hour in ACTIVE_HOURS
 
+def is_bot_active():
+    """Check if bot is active via environment variable"""
+    return os.environ.get("BOT_ACTIVE", "true").lower() == "true"
+
 async def main():
     log_event("info", "Initializing bot")
     insta = InstaClient("session.json")
@@ -96,6 +100,12 @@ async def main():
     last_hour = datetime.datetime.now().hour
 
     while True:
+        # Check if bot is active
+        if not is_bot_active():
+            log_event("info", "Bot is paused (BOT_ACTIVE=false), sleeping for 5 minutes")
+            await asyncio.sleep(300)  # Sleep for 5 minutes
+            continue
+
         if not is_active_time():
             log_event("info", "Outside active hours, sleeping for 1 hour")
             await asyncio.sleep(3600)
